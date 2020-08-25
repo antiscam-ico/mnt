@@ -1,7 +1,6 @@
 package transaction
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -13,22 +12,36 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"math/big"
 	"strconv"
+	"strings"
 )
 
-// Issue a check that will later be redeemed by the person of your choice.
+// Minter Check is like an ordinary bank check.
+// Each user of network can issue check with any amount of coins and pass it to another person.
+// Receiver will be able to cash a check from arbitrary account.
 type CheckData struct {
-	Nonce    []byte
-	ChainID  ChainID
-	DueBlock uint64
-	Coin     Coin
-	Value    *big.Int
-	GasCoin  Coin
-	Lock     *big.Int
-	V        *big.Int
-	R        *big.Int
-	S        *big.Int
+	Nonce    []byte   // Unique ID of the check
+	ChainID  ChainID  // ID of the network
+	DueBlock uint64   // Defines last block height in which the check can be used
+	Coin     CoinID   // ID of coin
+	Value    *big.Int // Amount of coins
+	GasCoin  CoinID   // ID of a coin to pay fee
+	Lock     *big.Int // Secret to prevent hijacking
+	V        *big.Int // V signature of issuer
+	R        *big.Int // R signature of issuer
+	S        *big.Int // S signature of issuer
 }
 
+// Tries returns sender of transaction and panics on error.
+func (check *CheckData) MustSender() string {
+	sender, err := check.Sender()
+	if err != nil {
+		panic(err)
+	}
+
+	return sender
+}
+
+// Return sender of transactions.
 func (check *CheckData) Sender() (string, error) {
 	pub, err := check.PublicKey()
 	if err != nil {
@@ -44,10 +57,11 @@ func (check *CheckData) String() string {
 		panic(err)
 	}
 
-	return fmt.Sprintf("Check sender: %s nonce: %x, dueBlock: %d, value: %s %s", sender, check.Nonce,
-		check.DueBlock, check.Value.String(), string(bytes.Trim(check.Coin[:], "\x00")))
+	return fmt.Sprintf("Check sender: %s nonce: %x, dueBlock: %d, value: %s, coinID: %s", sender, check.Nonce,
+		check.DueBlock, check.Value.String(), check.Coin)
 }
 
+// Returns public key from the transaction signature.
 func (check *CheckData) PublicKey() (string, error) {
 
 	if check.V.BitLen() > 8 {
@@ -92,13 +106,9 @@ func (check *CheckData) PublicKey() (string, error) {
 	return wallet.PubPrefix04ToMp(hex.EncodeToString(pub)), nil
 }
 
-type Signed interface {
-	Encode() (string, error)
-}
-
 type CheckInterface interface {
 	SetPassphrase(passphrase string) CheckInterface
-	Sign(prKey string) (Signed, error)
+	Sign(prKey string) (EncodeInterface, error)
 }
 
 type Check struct {
@@ -106,26 +116,44 @@ type Check struct {
 	passphrase string
 }
 
-// Create Check
-// Nonce - unique "id" of the check. Coin Symbol - symbol of coin. Value - amount of coins.
-// Due Block - defines last block height in which the check can be used.
-func NewCheck(nonce uint64, chainID ChainID, dueBlock uint64, coin string, value *big.Int, gasCoin string) CheckInterface {
+// Issue a check that will later be redeemed by the person of your choice.
+func NewCheck(nonce uint64, chainID ChainID, dueBlock uint64, coin CoinID, value *big.Int, gasCoin CoinID) CheckInterface {
 	check := &Check{
 		CheckData: &CheckData{
 			Nonce:    []byte(strconv.Itoa(int(nonce))),
 			ChainID:  chainID,
 			DueBlock: dueBlock,
+			Coin:     coin,
 			Value:    value,
+			GasCoin:  gasCoin,
 		},
 	}
-	copy(check.Coin[:], coin)
-	copy(check.GasCoin[:], gasCoin)
 	return check
 }
 
-// Prepare check string and convert to data
-func DecodeCheck(rawCheck string) (*CheckData, error) {
+// Get CheckData from RLP-encoded structure in base64 format.
+func DecodeCheckBase64(rawCheck string) (*CheckData, error) {
 	decode, err := base64.StdEncoding.DecodeString(rawCheck)
+	if err != nil {
+		panic(err)
+	}
+
+	res := new(CheckData)
+	if err := rlp.DecodeBytes(decode, res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// Get CheckData from RLP-encoded structure in hex format.
+func DecodeCheck(check string) (*CheckData, error) {
+	check = strings.Title(strings.ToLower(check))
+	if !strings.HasPrefix(check, "Mc") {
+		return nil, errors.New("check don't has prefix 'Mc'")
+	}
+
+	decode, err := hex.DecodeString(check[2:])
 	if err != nil {
 		panic(err)
 	}
@@ -144,18 +172,28 @@ func (check *Check) SetPassphrase(passphrase string) CheckInterface {
 	return check
 }
 
-//
+// Get string representation of a check. Checks are prefixed with "Mc". RLP-encoded structure in hex format.
 func (check *Check) Encode() (string, error) {
 	src, err := rlp.EncodeToBytes(check.CheckData)
 	if err != nil {
 		return "", err
 	}
 
-	return "Mc" + hex.EncodeToString(src), err
+	return "Mc" + hex.EncodeToString(src), nil
 }
 
-// Sign Check
-func (check *Check) Sign(prKey string) (Signed, error) {
+// Get string representation of a check. RLP-encoded structure in base64 format.
+func (check *Check) EncodeBase64() (string, error) {
+	src, err := rlp.EncodeToBytes(check.CheckData)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(src), nil
+}
+
+// Sign Check with private key
+func (check *Check) Sign(prKey string) (EncodeInterface, error) {
 	msgHash, err := rlpHash([]interface{}{
 		check.Nonce,
 		check.ChainID,

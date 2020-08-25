@@ -5,25 +5,28 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// Transaction for turning candidate off. This transaction should be sent from address which is set in the "Declare candidacy transaction".
-// PubKey - Public key of a validator.
+// Transaction data for turning candidate off.
+// This transaction should be sent from address which is set in the "Declare candidacy transaction".
 type SetCandidateOffData struct {
-	PubKey []byte
+	PubKey [32]byte // Public key of a validator
 }
 
+// New data of Transaction for turning candidate off.
 func NewSetCandidateOffData() *SetCandidateOffData {
 	return &SetCandidateOffData{}
 }
 
+// Set public key of a validator.
 func (d *SetCandidateOffData) SetPubKey(key string) (*SetCandidateOffData, error) {
-	var err error
-	d.PubKey, err = wallet.PublicKeyToHex(key)
+	pubKey, err := wallet.PublicKeyToHex(key)
 	if err != nil {
 		return d, err
 	}
+	copy(d.PubKey[:], pubKey)
 	return d, nil
 }
 
+// Tries to set public key of validator and panics on error.
 func (d *SetCandidateOffData) MustSetPubKey(key string) *SetCandidateOffData {
 	_, err := d.SetPubKey(key)
 	if err != nil {
@@ -32,9 +35,14 @@ func (d *SetCandidateOffData) MustSetPubKey(key string) *SetCandidateOffData {
 	return d
 }
 
+func (d *SetCandidateOffData) Type() Type {
+	return TypeSetCandidateOffline
+}
+
+func (d *SetCandidateOffData) Fee() Fee {
+	return feeTypeSetCandidateOffline
+}
+
 func (d *SetCandidateOffData) encode() ([]byte, error) {
 	return rlp.EncodeToBytes(d)
-}
-func (d *SetCandidateOffData) fee() fee {
-	return feeTypeSetCandidateOffline
 }
