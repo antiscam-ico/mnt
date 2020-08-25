@@ -2,21 +2,21 @@ package transaction_test
 
 import (
 	"fmt"
-	"github.com/MinterTeam/minter-go-sdk/transaction"
+	"github.com/MinterTeam/minter-go-sdk/v2/transaction"
 	"math/big"
 )
 
-func ExampleBuilder_NewTransaction_signSimple() {
+func ExampleObject_Sign_simple() {
 	tx, _ := transaction.NewBuilder(transaction.TestNetChainID).NewTransaction(
 		transaction.NewSendData().
-			SetCoin("MNT").
+			SetCoin(1).
 			SetValue(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil))).
 			MustSetTo("Mx1b685a7c1e78726c48f619c497a07ed75fe00483"),
 	)
 
 	signedTransaction, _ := tx.
 		SetGasPrice(1).
-		SetGasCoin("MNT").
+		SetGasCoin(1).
 		SetNonce(1).
 		Sign("07bc17abdcee8b971bb8723e36fe9d2523306d5ab2d683631693238e0f9df142")
 
@@ -29,34 +29,28 @@ func ExampleBuilder_NewTransaction_signSimple() {
 	hash, _ := signedTransaction.Hash()
 	fmt.Println(hash)
 
+	encode, _ := signedTransaction.Encode()
+	fmt.Println(encode)
+
 	// Output:
 	// Mx622e1e0e788f4b1258f7e2a196f738c6a360c3de
 	// 10000000000000000
-	// Mt13b73500c171006613fa8e82cc8b29857af1d63a34ca2cada95024bacca1670c
+	// Mtec2166cced36276426360a79934fbf49f29f9e48e9d1f06ef4afc4f557aa3767
+	// 0xf8700102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808001b845f8431ba0fffc3f503ace8a5d0c87efe50cf33ad41e3475459120d9c6fd75bd796b192313a0243d643a799e844ad82382d41cee98137a1d0c5888ff13951919e5e241ab89e0
 
 }
 
 func ExampleBuilder_NewTransaction_signMultiSignature1() {
-	createMultisigData := transaction.NewCreateMultisigData().
-		MustAddSigData("Mx08d920c5d93dbf23038fe1a54bbb34f41f77677c", 1).
-		MustAddSigData("Mx6bf192730d01a19739b5030cdb6a60c992712a59", 3).
-		MustAddSigData("Mx823bb524d5702addbe13086082f7f0310e07d176", 5).
-		SetThreshold(7)
-
-	multisigAddress := createMultisigData.AddressString()
-	fmt.Println(multisigAddress)
-	// Result: Mx0023aa9371e0779189ef5a7434456fc21a938945
-
-	symbolMNT := "MNT"
+	coinID := transaction.CoinID(1)
 	data, _ := transaction.NewSendData().
-		SetCoin(symbolMNT).
+		SetCoin(coinID).
 		SetValue(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil))).
 		SetTo("Mx1b685a7c1e78726c48f619c497a07ed75fe00483")
 
 	tx, _ := transaction.NewBuilder(transaction.TestNetChainID).NewTransaction(data)
 
-	signedTx, _ := tx.SetNonce(1).SetGasPrice(1).SetGasCoin(symbolMNT).SetSignatureType(transaction.SignatureTypeMulti).Sign(
-		multisigAddress,
+	signedTx, _ := tx.SetNonce(1).SetGasPrice(1).SetGasCoin(coinID).SetSignatureType(transaction.SignatureTypeMulti).Sign(
+		"Mxdb4f4b6942cb927e8d7e3a1f602d0f1fb43b5bd2",
 		"ae089b32e4e0976ca6888cb1023148bd1a9f1cc28c5d442e52e586754ff48d63",
 		"b0a65cd84d57189b70d80fe0b3d5fa3ea6e02fa48041314a587a1f8fdba703d7",
 		"4c8dbfb3258f383adf656c2131e5ed77ec482a36125db71fb49d29e0528ff2ba",
@@ -64,66 +58,94 @@ func ExampleBuilder_NewTransaction_signMultiSignature1() {
 
 	encode, _ := signedTx.Encode()
 	fmt.Println(encode)
-	// Result: 0xf901270102018a4d4e540000000000000001aae98a4d4e5400000000000000941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ba0014aaffef58c3def74bbb828d7cba907df59b50a68749b8d90aa0d7520571be3a04397def13aa5a38b666d5ecf590af7fdec18663bfa448d517d6671fbe25cdde6f8431ba07bd81f68708141c01ed3bac914cc04dc07831989cb86c4b0e992ad9677bfa33aa03b0d936c268e080bbb85a70cfa6c48a88f023d9e06fa4ecfb9e3cb6659bc767af8431ba0767922509d65315ddf728da8cf5450fa8ba410680f7046405a1eeb7cf22f521aa01222a82c41f7ef51e5b6a64414078185393578f8a5373ac5f5a19ee512b9317b
+	// Result: 0xf901130102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e694db4f4b6942cb927e8d7e3a1f602d0f1fb43b5bd2f8cff8431ca07dd407fa5d2a161581d03cdeb7c94fcd5ade47d376af75f2c92d1483f821fe2ca00d16b6cdbceaadcd0fd72bd39ee17841871da333a571535fccfbcf6285881c2af8431ba07c2d063126024a1e19363e7e254312ca9ab37795b06102da25bd1c0dec81a934a043b7bec83db41c594ac7a8d416fca2f83f0e65ada1221fe659ba4dbe1f3c921af8431ba09318e56a242c39c10ce87ab51d10322cc62cf23885867bc89a24e8c3fa8483e9a04c82c1224d1b4efa7fba06623da2896745ce444d35ed77973759e6404b66bb95
 
 	// Output:
-	// Mx0023aa9371e0779189ef5a7434456fc21a938945
-	// 0xf901270102018a4d4e540000000000000001aae98a4d4e5400000000000000941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ba0014aaffef58c3def74bbb828d7cba907df59b50a68749b8d90aa0d7520571be3a04397def13aa5a38b666d5ecf590af7fdec18663bfa448d517d6671fbe25cdde6f8431ba07bd81f68708141c01ed3bac914cc04dc07831989cb86c4b0e992ad9677bfa33aa03b0d936c268e080bbb85a70cfa6c48a88f023d9e06fa4ecfb9e3cb6659bc767af8431ba0767922509d65315ddf728da8cf5450fa8ba410680f7046405a1eeb7cf22f521aa01222a82c41f7ef51e5b6a64414078185393578f8a5373ac5f5a19ee512b9317b
+	// 0xf901130102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e694db4f4b6942cb927e8d7e3a1f602d0f1fb43b5bd2f8cff8431ca07dd407fa5d2a161581d03cdeb7c94fcd5ade47d376af75f2c92d1483f821fe2ca00d16b6cdbceaadcd0fd72bd39ee17841871da333a571535fccfbcf6285881c2af8431ba07c2d063126024a1e19363e7e254312ca9ab37795b06102da25bd1c0dec81a934a043b7bec83db41c594ac7a8d416fca2f83f0e65ada1221fe659ba4dbe1f3c921af8431ba09318e56a242c39c10ce87ab51d10322cc62cf23885867bc89a24e8c3fa8483e9a04c82c1224d1b4efa7fba06623da2896745ce444d35ed77973759e6404b66bb95
 }
 
 func ExampleBuilder_NewTransaction_signMultiSignature2() {
-	symbolMNT := "MNT"
+	coinID := transaction.CoinID(1)
 	data, _ := transaction.NewSendData().
-		SetCoin(symbolMNT).
+		SetCoin(coinID).
 		SetValue(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil))).
 		SetTo("Mx1b685a7c1e78726c48f619c497a07ed75fe00483")
 
 	tx, _ := transaction.NewBuilder(transaction.TestNetChainID).NewTransaction(data)
-	tx.SetNonce(1).SetGasPrice(1).SetGasCoin(symbolMNT).SetSignatureType(transaction.SignatureTypeMulti)
+	tx.SetNonce(1).SetGasPrice(1).SetGasCoin(coinID).SetSignatureType(transaction.SignatureTypeMulti)
 
+	msigAddress := "Mx0023aa9371e0779189ef5a7434456fc21a938945"
 	signedTx1, _ := tx.Sign(
-		"Mx0023aa9371e0779189ef5a7434456fc21a938945",
+		msigAddress,
 		"ae089b32e4e0976ca6888cb1023148bd1a9f1cc28c5d442e52e586754ff48d63",
 	)
 	signedTx2, _ := signedTx1.Sign(
-		"Mx0023aa9371e0779189ef5a7434456fc21a938945",
+		msigAddress,
 		"b0a65cd84d57189b70d80fe0b3d5fa3ea6e02fa48041314a587a1f8fdba703d7",
 	)
 	signedTx3, _ := signedTx2.Sign(
-		"Mx0023aa9371e0779189ef5a7434456fc21a938945",
+		msigAddress,
 		"4c8dbfb3258f383adf656c2131e5ed77ec482a36125db71fb49d29e0528ff2ba",
 	)
 
 	encode, _ := signedTx3.Encode()
 	fmt.Println(encode)
 	// Output:
-	// 0xf901270102018a4d4e540000000000000001aae98a4d4e5400000000000000941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ba0014aaffef58c3def74bbb828d7cba907df59b50a68749b8d90aa0d7520571be3a04397def13aa5a38b666d5ecf590af7fdec18663bfa448d517d6671fbe25cdde6f8431ba07bd81f68708141c01ed3bac914cc04dc07831989cb86c4b0e992ad9677bfa33aa03b0d936c268e080bbb85a70cfa6c48a88f023d9e06fa4ecfb9e3cb6659bc767af8431ba0767922509d65315ddf728da8cf5450fa8ba410680f7046405a1eeb7cf22f521aa01222a82c41f7ef51e5b6a64414078185393578f8a5373ac5f5a19ee512b9317b
+	// 0xf901130102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ca07dd407fa5d2a161581d03cdeb7c94fcd5ade47d376af75f2c92d1483f821fe2ca00d16b6cdbceaadcd0fd72bd39ee17841871da333a571535fccfbcf6285881c2af8431ba07c2d063126024a1e19363e7e254312ca9ab37795b06102da25bd1c0dec81a934a043b7bec83db41c594ac7a8d416fca2f83f0e65ada1221fe659ba4dbe1f3c921af8431ba09318e56a242c39c10ce87ab51d10322cc62cf23885867bc89a24e8c3fa8483e9a04c82c1224d1b4efa7fba06623da2896745ce444d35ed77973759e6404b66bb95
 
 }
 
-func ExampleBuilder_NewTransaction_signMultiSignature3() {
-	symbolMNT := "MNT"
+func ExampleSignatureMulti_Single() {
+	coinID := transaction.CoinID(1)
 	data, _ := transaction.NewSendData().
-		SetCoin(symbolMNT).
+		SetCoin(coinID).
 		SetValue(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil))).
 		SetTo("Mx1b685a7c1e78726c48f619c497a07ed75fe00483")
 
 	tx, _ := transaction.NewBuilder(transaction.TestNetChainID).NewTransaction(data)
-	tx.SetNonce(1).SetGasPrice(1).SetGasCoin(symbolMNT).SetSignatureType(transaction.SignatureTypeMulti)
+	tx.SetNonce(1).SetGasPrice(1).SetGasCoin(coinID).SetSignatureType(transaction.SignatureTypeMulti)
 
 	msigAddress := "Mx0023aa9371e0779189ef5a7434456fc21a938945"
 	signedTx1, _ := tx.Clone().Sign(msigAddress, "ae089b32e4e0976ca6888cb1023148bd1a9f1cc28c5d442e52e586754ff48d63")
 	signedTx2, _ := tx.Clone().Sign(msigAddress, "b0a65cd84d57189b70d80fe0b3d5fa3ea6e02fa48041314a587a1f8fdba703d7")
 	signedTx3, _ := tx.Clone().Sign(msigAddress, "4c8dbfb3258f383adf656c2131e5ed77ec482a36125db71fb49d29e0528ff2ba")
-	simpleSignatureData1, _ := signedTx1.SimpleSignatureData()
-	simpleSignatureData2, _ := signedTx2.SimpleSignatureData()
-	simpleSignatureData3, _ := signedTx3.SimpleSignatureData()
+	simpleSignatureData1, _ := signedTx1.SingleSignatureData()
+	simpleSignatureData2, _ := signedTx2.SingleSignatureData()
+	simpleSignatureData3, _ := signedTx3.SingleSignatureData()
 	signedTransaction, _ := tx.Clone().Sign(msigAddress)
 	signedTx123, _ := signedTransaction.AddSignature(simpleSignatureData1, simpleSignatureData2, simpleSignatureData3)
 
 	encode, _ := signedTx123.Encode()
 	fmt.Println(encode)
 	// Output:
-	// 0xf901270102018a4d4e540000000000000001aae98a4d4e5400000000000000941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ba0014aaffef58c3def74bbb828d7cba907df59b50a68749b8d90aa0d7520571be3a04397def13aa5a38b666d5ecf590af7fdec18663bfa448d517d6671fbe25cdde6f8431ba07bd81f68708141c01ed3bac914cc04dc07831989cb86c4b0e992ad9677bfa33aa03b0d936c268e080bbb85a70cfa6c48a88f023d9e06fa4ecfb9e3cb6659bc767af8431ba0767922509d65315ddf728da8cf5450fa8ba410680f7046405a1eeb7cf22f521aa01222a82c41f7ef51e5b6a64414078185393578f8a5373ac5f5a19ee512b9317b
+	// 0xf901130102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ca07dd407fa5d2a161581d03cdeb7c94fcd5ade47d376af75f2c92d1483f821fe2ca00d16b6cdbceaadcd0fd72bd39ee17841871da333a571535fccfbcf6285881c2af8431ba07c2d063126024a1e19363e7e254312ca9ab37795b06102da25bd1c0dec81a934a043b7bec83db41c594ac7a8d416fca2f83f0e65ada1221fe659ba4dbe1f3c921af8431ba09318e56a242c39c10ce87ab51d10322cc62cf23885867bc89a24e8c3fa8483e9a04c82c1224d1b4efa7fba06623da2896745ce444d35ed77973759e6404b66bb95
 
+}
+
+func ExampleObject_Signers_multi() {
+	decode, _ := transaction.Decode("0xf901130102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808002b8e8f8e6940023aa9371e0779189ef5a7434456fc21a938945f8cff8431ca07dd407fa5d2a161581d03cdeb7c94fcd5ade47d376af75f2c92d1483f821fe2ca00d16b6cdbceaadcd0fd72bd39ee17841871da333a571535fccfbcf6285881c2af8431ba07c2d063126024a1e19363e7e254312ca9ab37795b06102da25bd1c0dec81a934a043b7bec83db41c594ac7a8d416fca2f83f0e65ada1221fe659ba4dbe1f3c921af8431ba09318e56a242c39c10ce87ab51d10322cc62cf23885867bc89a24e8c3fa8483e9a04c82c1224d1b4efa7fba06623da2896745ce444d35ed77973759e6404b66bb95")
+	signers, _ := decode.Signers()
+	for _, signer := range signers {
+		fmt.Println(signer)
+	}
+
+	// Output:
+	// Mx08d920c5d93dbf23038fe1a54bbb34f41f77677c
+	// Mx6bf192730d01a19739b5030cdb6a60c992712a59
+	// Mx823bb524d5702addbe13086082f7f0310e07d176
+}
+
+func ExampleObject_Signers_single() {
+	decode, _ := transaction.Decode("0xf8700102010101a0df01941b685a7c1e78726c48f619c497a07ed75fe00483880de0b6b3a7640000808001b845f8431ba0fffc3f503ace8a5d0c87efe50cf33ad41e3475459120d9c6fd75bd796b192313a0243d643a799e844ad82382d41cee98137a1d0c5888ff13951919e5e241ab89e0")
+	signers, _ := decode.Signers()
+	for _, signer := range signers {
+		fmt.Println(signer)
+	}
+
+	address, _ := decode.SenderAddress()
+	fmt.Println(address)
+
+	// Output:
+	// Mx622e1e0e788f4b1258f7e2a196f738c6a360c3de
+	// Mx622e1e0e788f4b1258f7e2a196f738c6a360c3de
 }

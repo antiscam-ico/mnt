@@ -1,32 +1,34 @@
 package transaction
 
 import (
-	"github.com/MinterTeam/minter-go-sdk/wallet"
+	"github.com/MinterTeam/minter-go-sdk/v2/wallet"
 	"github.com/ethereum/go-ethereum/rlp"
 	"math/big"
 )
 
-// Transaction for delegating funds to validator.
-// PubKey - Public key of a validator. Coin - Symbol of coin to stake. Value - Amount of coins to stake.
+// Transaction data for delegating funds to validator.
 type DelegateData struct {
-	PubKey []byte
-	Coin   Coin
-	Value  *big.Int
+	PubKey [32]byte // Public key of a validator
+	Coin   CoinID   // ID of coin to stake
+	Value  *big.Int // Amount of coins to stake
 }
 
+// New data of transaction for delegating funds to validator
 func NewDelegateData() *DelegateData {
 	return &DelegateData{}
 }
 
+// Set public key of a validator.
 func (d *DelegateData) SetPubKey(key string) (*DelegateData, error) {
-	var err error
-	d.PubKey, err = wallet.PublicKeyToHex(key)
+	pubKey, err := wallet.PublicKeyToHex(key)
 	if err != nil {
 		return d, err
 	}
+	copy(d.PubKey[:], pubKey)
 	return d, nil
 }
 
+//  Tries to set public key of validator and panics on error.
 func (d *DelegateData) MustSetPubKey(key string) *DelegateData {
 	_, err := d.SetPubKey(key)
 	if err != nil {
@@ -35,20 +37,26 @@ func (d *DelegateData) MustSetPubKey(key string) *DelegateData {
 	return d
 }
 
-func (d *DelegateData) SetCoin(symbol string) *DelegateData {
-	copy(d.Coin[:], symbol)
+// Set ID of coin to stake.
+func (d *DelegateData) SetCoin(id CoinID) *DelegateData {
+	d.Coin = id
 	return d
 }
 
+// Set amount of coins to stake.
 func (d *DelegateData) SetValue(value *big.Int) *DelegateData {
 	d.Value = value
 	return d
 }
 
-func (d *DelegateData) encode() ([]byte, error) {
-	return rlp.EncodeToBytes(d)
+func (d *DelegateData) Type() Type {
+	return TypeDelegate
 }
 
-func (d *DelegateData) fee() fee {
+func (d *DelegateData) Fee() Fee {
 	return feeTypeDelegate
+}
+
+func (d *DelegateData) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(d)
 }

@@ -8,7 +8,7 @@ import (
 func TestTransactionUnbond_Sign(t *testing.T) {
 	data := NewUnbondData().
 		MustSetPubKey("Mp0eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a43").
-		SetCoin("MNT").
+		SetCoin(1).
 		SetValue(big.NewInt(0).Mul(big.NewInt(10), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil)))
 
 	tx, err := NewBuilder(TestNetChainID).NewTransaction(data)
@@ -19,14 +19,14 @@ func TestTransactionUnbond_Sign(t *testing.T) {
 	nonce := uint64(1)
 	gasPrice := uint8(1)
 
-	transaction := tx.SetNonce(nonce).SetGasPrice(gasPrice).SetGasCoin("MNT")
+	transaction := tx.SetNonce(nonce).SetGasPrice(gasPrice).SetGasCoin(1)
 
 	signedTx, err := transaction.Sign("6e1df6ec69638d152f563c5eca6c13cdb5db4055861efc11ec1cdd578afd96bf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	validSignature := "0xf88f0102018a4d4e540000000000000008b6f5a00eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a438a4d4e5400000000000000888ac7230489e80000808001b844f8421ca0ff5766c85847b37a276f3f9d027fb7c99745920fa395c7bd399cedd8265c5e1d9f791bcdfe4d1bc1e73ada7bf833103c828f22d83189dad2b22ad28a54aacf2a"
+	validSignature := "0xf87c0102010108aceba00eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a4301888ac7230489e80000808001b845f8431ca0f5b9273c522c6b948523ae922594389619fd5c21846361bec6c72ee2c45b9a21a00dbeed5293f74a0a7924f2a3459f57270358d8621e092f66da38d0dbab9055e1"
 	bytes, err := signedTx.Encode()
 	if err != nil {
 		t.Fatal(err)

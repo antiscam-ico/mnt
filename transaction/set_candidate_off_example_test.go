@@ -2,7 +2,7 @@ package transaction_test
 
 import (
 	"fmt"
-	"github.com/MinterTeam/minter-go-sdk/transaction"
+	"github.com/MinterTeam/minter-go-sdk/v2/transaction"
 )
 
 func ExampleNewSetCandidateOffData() {
@@ -10,9 +10,9 @@ func ExampleNewSetCandidateOffData() {
 		MustSetPubKey("Mp0eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a43")
 
 	tx, _ := transaction.NewBuilder(transaction.TestNetChainID).NewTransaction(data)
-	signedTx, _ := tx.SetNonce(1).SetGasPrice(1).SetGasCoin("MNT").Sign("07bc17abdcee8b971bb8723e36fe9d2523306d5ab2d683631693238e0f9df142")
+	signedTx, _ := tx.SetNonce(1).SetGasPrice(1).SetGasCoin(1).Sign("07bc17abdcee8b971bb8723e36fe9d2523306d5ab2d683631693238e0f9df142")
 	signedTxEncode, _ := signedTx.Encode()
 	fmt.Println(signedTxEncode)
 	// Output:
-	// 0xf87b0102018a4d4e54000000000000000ba2e1a00eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a43808001b844f8421ba0691f8353018ff13d13b4ffe19dc70a629eb51d9e2e18aa565aa94a6f66ff57ae9fc678a3f99445d63e8a4b75a05f4f6844c5b553c1c10dc663324bbbba15cca3
+	// 0xf872010201010ba2e1a00eb98ea04ae466d8d38f490db3c99b3996a90e24243952ce9822c6dc1e2c1a43808001b845f8431ca09c65f9b35430a5bcb64dc132f8167abbf878bf29ca2ad146a38a910d7b3dd70fa0706248027a98d2f54e78ab0ab9378b0d134d7e20be04a10c8836b8911c30f41f
 }

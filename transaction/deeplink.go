@@ -2,22 +2,21 @@ package transaction
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/rlp"
 	"net/url"
 )
 
 type DeepLink struct {
-	Type    Type
-	Data    []byte
-	Payload []byte
-
-	Nonce    *uint // optional
-	GasPrice *uint // optional
-	GasCoin  *Coin // optional
+	Type     Type    // type of transaction
+	Data     []byte  // data of transaction (depends on transaction type)
+	Payload  []byte  // optional, arbitrary user-defined bytes
+	Nonce    *uint   `rlp:"nil"` // optional, used for prevent transaction reply
+	GasPrice *uint   `rlp:"nil"` // optional, fee multiplier, should be equal or greater than current mempool min gas price
+	GasCoin  *CoinID `rlp:"nil"` // optional, ID of a coin to pay fee, right padded with zeros
 }
 
+// Returns url link.
 func (d *DeepLink) CreateLink(pass string) (string, error) {
 	tx, err := d.Encode()
 	if err != nil {
@@ -38,6 +37,7 @@ func (d *DeepLink) CreateLink(pass string) (string, error) {
 	return u.String(), nil
 }
 
+// Returns tx-like data. RLP-encoded structure in base64url format.
 func (d *DeepLink) Encode() (string, error) {
 	src, err := rlp.EncodeToBytes(d)
 	if err != nil {
@@ -52,58 +52,38 @@ func (d *DeepLink) setType(t Type) *DeepLink {
 	return d
 }
 
+// Set arbitrary user-defined bytes
 func (d *DeepLink) SetPayload(payload []byte) *DeepLink {
 	d.Payload = payload
 	return d
 }
 
-func (d *DeepLink) SetGasCoin(symbol string) *DeepLink {
-	gasCoin := Coin{}
-	d.GasCoin = &gasCoin
-	copy(d.GasCoin[:], symbol)
+// Set nonce of transaction
+func (d *DeepLink) SetNonce(nonce uint) *DeepLink {
+	d.Nonce = &nonce
 	return d
 }
 
-func NewDeepLink(data DataInterface) (*DeepLink, error) {
+// Set fee multiplier.
+func (d *DeepLink) SetGasPrice(gasPrice uint) *DeepLink {
+	d.GasPrice = &gasPrice
+	return d
+}
+
+// Set ID of a coin to pay fee
+func (d *DeepLink) SetGasCoin(id CoinID) *DeepLink {
+	d.GasCoin = &id
+	return d
+}
+
+func NewDeepLink(data Data) (*DeepLink, error) {
 	d := new(DeepLink)
 
-	bytes, err := data.encode()
+	bytes, err := data.Encode()
 	if err != nil {
 		return d, err
 	}
 	d.Data = bytes
 
-	switch data.(type) {
-	case *SendData:
-		return d.setType(TypeSend), nil
-	case *SellCoinData:
-		return d.setType(TypeSellCoin), nil
-	case *SellAllCoinData:
-		return d.setType(TypeSellAllCoin), nil
-	case *BuyCoinData:
-		return d.setType(TypeBuyCoin), nil
-	case *CreateCoinData:
-		return d.setType(TypeCreateCoin), nil
-	case *DeclareCandidacyData:
-		return d.setType(TypeDeclareCandidacy), nil
-	case *DelegateData:
-		return d.setType(TypeDelegate), nil
-	case *UnbondData:
-		return d.setType(TypeUnbond), nil
-	case *RedeemCheckData:
-		return d.setType(TypeRedeemCheck), nil
-	case *SetCandidateOnData:
-		return d.setType(TypeSetCandidateOnline), nil
-	case *SetCandidateOffData:
-		return d.setType(TypeSetCandidateOffline), nil
-	case *CreateMultisigData:
-		return d.setType(TypeCreateMultisig), nil
-	case *MultisendData:
-		return d.setType(TypeMultisend), nil
-	case *EditCandidateData:
-		return d.setType(TypeEditCandidate), nil
-
-	default:
-		return nil, errors.New("unknown transaction type")
-	}
+	return d.setType(data.Type()), nil
 }

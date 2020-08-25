@@ -6,18 +6,21 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/MinterTeam/minter-go-sdk/wallet"
+	"github.com/MinterTeam/minter-go-sdk/v2/wallet"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 	"math/big"
+	"strconv"
 	"strings"
 )
 
+// Type of transaction is determined by a single byte.
 type Type byte
 
 const (
-	TypeSend Type = iota + 1
+	_ Type = iota
+	TypeSend
 	TypeSellCoin
 	TypeSellAllCoin
 	TypeBuyCoin
@@ -31,25 +34,36 @@ const (
 	TypeCreateMultisig
 	TypeMultisend
 	TypeEditCandidate
+	TypeSetHaltBlock
+	TypeRecreateCoin
+	TypeChangeCoinOwner
+	TypeEditMultisigOwners
+	TypePriceVote
 )
 
-type fee uint
+// For each transaction sender should pay fee. Fees are measured in "units".
+type Fee uint
 
 const (
-	feeTypeSend                fee = 10
-	feeTypeSellCoin            fee = 100
-	feeTypeSellAllCoin         fee = 100
-	feeTypeBuyCoin             fee = 100
-	feeTypeCreateCoin          fee = 1000
-	feeTypeDeclareCandidacy    fee = 10000
-	feeTypeDelegate            fee = 200
-	feeTypeUnbond              fee = 200
-	feeTypeRedeemCheck         fee = 30
-	feeTypeSetCandidateOnline  fee = 100
-	feeTypeSetCandidateOffline fee = 100
-	feeTypeCreateMultisig      fee = 100
-	// feeMultisend fee =  10+(n-1)*5
-	feeTypeEditCandidate fee = 100000
+	feeTypeSend                Fee = 10
+	feeTypeSellCoin            Fee = 100
+	feeTypeSellAllCoin         Fee = 100
+	feeTypeBuyCoin             Fee = 100
+	feeTypeCreateCoin          Fee = 1000
+	feeTypeDeclareCandidacy    Fee = 10000
+	feeTypeDelegate            Fee = 200
+	feeTypeUnbond              Fee = 200
+	feeTypeRedeemCheck         Fee = 30
+	feeTypeSetCandidateOnline  Fee = 100
+	feeTypeSetCandidateOffline Fee = 100
+	feeTypeCreateMultisig      Fee = 100
+	// feeMultisend Fee =  10+(n-1)*5
+	feeTypeEditCandidate   Fee = 100000
+	feeTypeSetHaltBlock    Fee = 1000
+	feeTypeRecreateCoin    Fee = 10000000
+	feeTypeChangeCoinOwner Fee = 10000000
+	feeEditMultisigOwners  Fee = 1000
+	feePriceVote           Fee = 10
 )
 
 type SignatureType byte
@@ -60,6 +74,7 @@ const (
 	SignatureTypeMulti
 )
 
+// id of the network (1 - mainnet, 2 - testnet)
 type ChainID byte
 
 const (
@@ -72,12 +87,14 @@ type Builder struct {
 	ChainID ChainID
 }
 
+// New builder for transactions
 func NewBuilder(chainID ChainID) *Builder {
 	return &Builder{ChainID: chainID}
 }
 
-func (b *Builder) NewTransaction(data DataInterface) (Interface, error) {
-	dataBytes, err := data.encode()
+// New transaction from data
+func (b *Builder) NewTransaction(data Data) (Interface, error) {
+	dataBytes, err := data.Encode()
 	if err != nil {
 		return nil, err
 	}
@@ -88,127 +105,136 @@ func (b *Builder) NewTransaction(data DataInterface) (Interface, error) {
 		Data:          dataBytes,
 	}
 
-	object := object{
+	object := &Object{
 		Transaction: transaction,
 		data:        data,
 	}
 
-	switch data.(type) {
-	case *SendData:
-		return object.setType(TypeSend), nil
-	case *SellCoinData:
-		return object.setType(TypeSellCoin), nil
-	case *SellAllCoinData:
-		return object.setType(TypeSellAllCoin), nil
-	case *BuyCoinData:
-		return object.setType(TypeBuyCoin), nil
-	case *CreateCoinData:
-		return object.setType(TypeCreateCoin), nil
-	case *DeclareCandidacyData:
-		return object.setType(TypeDeclareCandidacy), nil
-	case *DelegateData:
-		return object.setType(TypeDelegate), nil
-	case *UnbondData:
-		return object.setType(TypeUnbond), nil
-	case *RedeemCheckData:
-		return object.setType(TypeRedeemCheck), nil
-	case *SetCandidateOnData:
-		return object.setType(TypeSetCandidateOnline), nil
-	case *SetCandidateOffData:
-		return object.setType(TypeSetCandidateOffline), nil
-	case *CreateMultisigData:
-		return object.setType(TypeCreateMultisig), nil
-	case *MultisendData:
-		return object.setType(TypeMultisend), nil
-	case *EditCandidateData:
-		return object.setType(TypeEditCandidate), nil
-
-	default:
-		return nil, errors.New("unknown transaction type")
-	}
+	return object.setType(data.Type()), nil
 }
 
-type DataInterface interface {
-	encode() ([]byte, error)
-	fee() fee
+type Data interface {
+	// Get bytes representation of a transaction data.
+	Encode() ([]byte, error)
+	// Get transaction data type
+	Type() Type
+	// Get transaction data fee
+	Fee() Fee
 }
 
-type Coin [10]byte
+// ID of a coin
+type CoinID uint32
 
-func (c Coin) String() string { return string(bytes.Trim(c[:], "\x00")) }
+func (c CoinID) String() string { return strconv.Itoa(int(c)) }
+
+// Symbol of a coin
+type CoinSymbol [10]byte
+
+func (c CoinSymbol) String() string { return string(bytes.Trim(c[:], "\x00")) }
 
 type EncodeInterface interface {
+	// Get string representation of a transaction.
 	Encode() (string, error)
 }
 
 type SignedTransaction interface {
 	EncodeInterface
+	// Get Transaction
 	GetTransaction() *Transaction
+	// Get fee of transaction in PIP. Also sender should pay extra 2 units per byte in Payload and Service Data fields.
 	Fee() *big.Int
+	// Get hash of transaction
 	Hash() (string, error)
-	Data() DataInterface
-	Signature() (signatureInterface, error)
+	// Get data of the transaction
+	Data() Data
+	// Get signature interface
+	Signature() (SignatureInterface, error)
+	// Add signature from bytes
 	AddSignature(signatures ...[]byte) (SignedTransaction, error)
+	// Get bytes of Signature
 	SignatureData() []byte
-	SimpleSignatureData() ([]byte, error)
+	// Get single SignatureData
+	SingleSignatureData() ([]byte, error)
+	// Get sender address
 	SenderAddress() (string, error)
+	// Get set of signers
+	Signers() ([]string, error)
+	// Sign transaction
 	Sign(prKey string, multisigPrKeys ...string) (SignedTransaction, error)
+	// Make a copy of the transaction
+	Clone() Interface
 }
 
 type Interface interface {
 	EncodeInterface
-	setType(t Type) Interface
+	// Set signature type
 	SetSignatureType(signatureType SignatureType) Interface
+	// Set signature type to SignatureTypeMulti
 	SetMultiSignatureType() Interface
-	setSignature(signature signatureInterface) (SignedTransaction, error)
+	// Set nonce of transaction
 	SetNonce(nonce uint64) Interface
-	SetGasCoin(name string) Interface
+	// Set ID of a coin to pay fee
+	SetGasCoin(id CoinID) Interface
+	// Set fee multiplier
 	SetGasPrice(price uint8) Interface
+	// Set arbitrary user-defined bytes
 	SetPayload(payload []byte) Interface
+	// Set ServiceData field
 	SetServiceData(serviceData []byte) Interface
+	// Sign transaction
 	Sign(key string, multisigPrKeys ...string) (SignedTransaction, error)
+	// Make a copy of the transaction
 	Clone() Interface
+
+	setType(t Type) Interface
+	setSignature(signature SignatureInterface) (SignedTransaction, error)
 }
 
-type object struct {
+type Object struct {
 	*Transaction
-	data DataInterface
+	data Data
 }
 
-// Get fee of transaction in PIP
-func (o *object) Fee() *big.Int {
-	gasPrice := big.NewInt(0).Mul(big.NewInt(int64(o.data.fee())), big.NewInt(1000000000000000))
+// Get fee of transaction in PIP. Also sender should pay extra 2 units per byte in Payload and Service Data fields.
+func (o *Object) Fee() *big.Int {
+	gasPrice := big.NewInt(0).Mul(big.NewInt(int64(o.data.Fee())), big.NewInt(1000000000000000))
 	commission := big.NewInt(0).Add(big.NewInt(0).Mul(big.NewInt(int64(len(o.Payload))*2), big.NewInt(1000000000000000)), big.NewInt(0).Mul(big.NewInt(int64(len(o.ServiceData))*2), big.NewInt(1000000000000000)))
 	return big.NewInt(0).Add(gasPrice, commission)
 }
 
-func (o *object) Data() DataInterface {
+// Get data of the transaction
+func (o *Object) Data() Data {
 	return o.data
 }
 
-func (o *object) Clone() Interface {
+// Make a copy of the transaction
+func (o *Object) Clone() Interface {
 	tx := *o.Transaction
-	return &object{Transaction: &tx, data: o.data}
+	return &Object{Transaction: &tx, data: o.data}
 }
 
-func (o *object) GetTransaction() *Transaction {
+// Get Transaction
+func (o *Object) GetTransaction() *Transaction {
 	return o.Transaction
 }
 
-func (o *object) SignatureData() []byte {
+// Get bytes of Signature
+func (o *Object) SignatureData() []byte {
 	return o.Transaction.SignatureData
 }
 
-func (o *object) SimpleSignatureData() ([]byte, error) {
+// Get first SignatureData
+func (o *Object) SingleSignatureData() ([]byte, error) {
 	s, err := o.Signature()
 	if err != nil {
 		return nil, err
 	}
-	return s.firstSig()
+	return s.Single()
 }
 
-func (o *object) Signature() (signatureInterface, error) {
-	var signature signatureInterface
+// Get signature interface
+func (o *Object) Signature() (SignatureInterface, error) {
+	var signature SignatureInterface
 	switch o.SignatureType {
 	case SignatureTypeSingle:
 		signature = &Signature{}
@@ -231,7 +257,7 @@ func (o *object) Signature() (signatureInterface, error) {
 }
 
 // Decode transaction
-func Decode(tx string) (SignedTransaction, error) {
+func Decode(tx string) (*Object, error) {
 	if !strings.HasPrefix(tx, "0x") {
 		return nil, errors.New("transaction don't has prefix '0x'")
 	}
@@ -247,7 +273,7 @@ func Decode(tx string) (SignedTransaction, error) {
 		return nil, err
 	}
 
-	var data interface{}
+	var data Data
 	switch transaction.Type {
 	case TypeSend:
 		data = &SendData{}
@@ -277,6 +303,12 @@ func Decode(tx string) (SignedTransaction, error) {
 		data = &MultisendData{}
 	case TypeEditCandidate:
 		data = &EditCandidateData{}
+	case TypeSetHaltBlock:
+		data = &SetHaltBlockData{}
+	case TypeRecreateCoin:
+		data = &RecreateCoinData{}
+	case TypeChangeCoinOwner:
+		data = &ChangeCoinOwnerData{}
 	default:
 		return nil, errors.New("unknown transaction type")
 	}
@@ -286,16 +318,21 @@ func Decode(tx string) (SignedTransaction, error) {
 		return nil, err
 	}
 
-	result := &object{
+	result := &Object{
 		Transaction: transaction,
-		data:        data.(DataInterface),
+		data:        data,
 	}
 	return result, nil
 }
 
 // Get sender address
-func (o *object) SenderAddress() (string, error) {
-	if o.SignatureType == SignatureTypeSingle {
+func (o *Object) SenderAddress() (string, error) {
+	signature, err := o.Signature()
+	if err != nil {
+		return "", err
+	}
+
+	if single, ok := signature.(*Signature); o.SignatureType == SignatureTypeSingle && ok {
 		hash, err := rlpHash([]interface{}{
 			o.Transaction.Nonce,
 			o.Transaction.ChainID,
@@ -311,62 +348,73 @@ func (o *object) SenderAddress() (string, error) {
 			return "", err
 		}
 
-		signature, err := o.Signature()
-		if err != nil {
-			return "", err
-		}
-
-		ecrecover, err := crypto.Ecrecover(hash[:], signature.(*Signature).toBytes())
-		if err != nil {
-			return "", err
-		}
-
-		address, err := wallet.AddressByPublicKey("Mp" + hex.EncodeToString(ecrecover))
-		if err != nil {
-			return "", err
-		}
-
-		return address, nil
+		return single.signer(hash, SignatureTypeSingle)
 	}
 
-	signature, err := o.Signature()
-	if err != nil {
-		return "", err
+	if multi, ok := signature.(*SignatureMulti); o.SignatureType == SignatureTypeMulti && ok {
+		return wallet.BytesToAddress(multi.Multisig), nil
 	}
 
-	return wallet.BytesToAddress(signature.(*SignatureMulti).Multisig), nil
+	return "", errors.New("signature is invalid")
 }
 
 type Transaction struct {
-	Nonce         uint64
-	ChainID       ChainID
-	GasPrice      uint8
-	GasCoin       Coin
-	Type          Type
-	Data          []byte
-	Payload       []byte
-	ServiceData   []byte
-	SignatureType SignatureType
-	SignatureData []byte
+	Nonce         uint64        // used for prevent transaction reply
+	ChainID       ChainID       // id of the network (1 - mainnet, 2 - testnet)
+	GasPrice      uint8         // fee multiplier, should be equal or greater than current mempool min gas price.
+	GasCoin       CoinID        // ID of a coin to pay fee, right padded with zeros
+	Type          Type          // type of transaction
+	Data          []byte        // data of transaction (depends on transaction type)
+	Payload       []byte        // arbitrary user-defined bytes
+	ServiceData   []byte        // reserved field
+	SignatureType SignatureType // single or multisig transaction
+	SignatureData []byte        // digital signature of transaction
 }
 
-type signatureInterface interface {
-	encode() ([]byte, error)
-	firstSig() ([]byte, error)
+type SignatureInterface interface {
+	// Get digital signature of transaction
+	Encode() ([]byte, error)
+	// Get SingleSignature
+	Single() ([]byte, error)
+	// Get signature type
+	Type() SignatureType
 }
 
+// Simple Signature
 type Signature struct {
 	V *big.Int
 	R *big.Int
 	S *big.Int
 }
 
-func (s *Signature) encode() ([]byte, error) {
+// Get signature type
+func (s *Signature) Type() SignatureType {
+	return SignatureTypeSingle
+}
+
+// Get digital signature of transaction
+func (s *Signature) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(s)
 }
 
-func (s *Signature) firstSig() ([]byte, error) {
-	return s.encode()
+// Get digital signature of transaction
+func (s *Signature) Single() ([]byte, error) {
+	return s.Encode()
+}
+
+// Get signer address
+func (s *Signature) signer(hash [32]byte, t SignatureType) (string, error) {
+	publicKey, err := crypto.Ecrecover(hash[:], s.toBytes())
+	if err != nil {
+		return "", err
+	}
+
+	address, err := wallet.AddressByPublicKey("Mp" + hex.EncodeToString(publicKey[t-1:]))
+	if err != nil {
+		return "", err
+	}
+
+	return address, nil
 }
 
 func decodeSignature(b []byte) (*Signature, error) {
@@ -375,52 +423,129 @@ func decodeSignature(b []byte) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, err
+	return s, nil
 }
 
 func (s *Signature) toBytes() []byte {
+	R, S := s.R.Bytes(), s.S.Bytes()
 	sig := make([]byte, 65)
-	copy(sig[:32], s.R.Bytes())
-	copy(sig[32:64], s.S.Bytes())
-	sig[64] = s.V.Bytes()[0] - 27
+	copy(sig[32-len(R):32], R)
+	copy(sig[64-len(S):64], S)
+	sig[64] = byte(s.V.Uint64() - 27)
 
 	return sig
 }
 
+func MultisigAddress(owner string, nonce uint64) string {
+	o, err := wallet.AddressToHex(owner)
+	if err != nil {
+		panic(err)
+	}
+
+	var ownerAddress [20]byte
+	copy(ownerAddress[:], o)
+
+	b, err := rlp.EncodeToBytes(&struct {
+		Owner [20]byte
+		Nonce uint64
+	}{Owner: ownerAddress, Nonce: nonce})
+	if err != nil {
+		panic(err)
+	}
+
+	var addr [20]byte
+	copy(addr[:], crypto.Keccak256(b)[12:])
+
+	return wallet.BytesToAddress(addr)
+}
+
+// Signature from Multisig address
 type SignatureMulti struct {
 	Multisig   [20]byte
 	Signatures []*Signature
 }
 
-func (s *SignatureMulti) encode() ([]byte, error) {
+// Get signature type
+func (s *SignatureMulti) Type() SignatureType {
+	return SignatureTypeMulti
+}
+
+// Get digital signature of transaction
+func (s *SignatureMulti) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(s)
 }
 
-func (s *SignatureMulti) firstSig() ([]byte, error) {
+// Get set of signers
+func (o *Object) Signers() ([]string, error) {
+	signatures, err := o.Signature()
+	if err != nil {
+		return nil, err
+	}
+
+	if multi, ok := signatures.(*SignatureMulti); o.SignatureType == SignatureTypeMulti && ok {
+		hash, err := rlpHash([]interface{}{
+			o.Transaction.Nonce,
+			o.Transaction.ChainID,
+			o.Transaction.GasPrice,
+			o.Transaction.GasCoin,
+			o.Transaction.Type,
+			o.Transaction.Data,
+			o.Transaction.Payload,
+			o.Transaction.ServiceData,
+			o.Transaction.SignatureType,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		signers := make([]string, 0, len(multi.Signatures))
+		for _, signature := range multi.Signatures {
+			address, err := signature.signer(hash, SignatureTypeMulti)
+			if err != nil {
+				return nil, err
+			}
+
+			signers = append(signers, address)
+		}
+		return signers, nil
+	}
+
+	address, err := o.SenderAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	return []string{address}, nil
+}
+
+// Get first SingleSignature
+func (s *SignatureMulti) Single() ([]byte, error) {
 	if len(s.Signatures) == 0 {
 		return nil, errors.New("signature not set")
 	}
-	return s.Signatures[0].encode()
+	return s.Signatures[0].Encode()
 }
 
-func (o *object) setType(t Type) Interface {
+func (o *Object) setType(t Type) Interface {
 	o.Type = t
 	return o
 }
 
-func (o *object) SetSignatureType(signatureType SignatureType) Interface {
+// Set signature type
+func (o *Object) SetSignatureType(signatureType SignatureType) Interface {
 	o.SignatureType = signatureType
 	return o
 }
 
-func (o *object) SetMultiSignatureType() Interface {
+// Set signature type to SignatureTypeMulti
+func (o *Object) SetMultiSignatureType() Interface {
 	o.SignatureType = SignatureTypeMulti
 	return o
 }
 
-func (o *object) setSignature(signature signatureInterface) (SignedTransaction, error) {
+func (o *Object) setSignature(signature SignatureInterface) (SignedTransaction, error) {
 	var err error
-	o.Transaction.SignatureData, err = signature.encode()
+	o.Transaction.SignatureData, err = signature.Encode()
 	if err != nil {
 		return nil, err
 	}
@@ -428,31 +553,37 @@ func (o *object) setSignature(signature signatureInterface) (SignedTransaction, 
 	return o, nil
 }
 
-func (o *object) SetNonce(nonce uint64) Interface {
+// Set nonce of transaction
+func (o *Object) SetNonce(nonce uint64) Interface {
 	o.Nonce = nonce
 	return o
 }
 
-func (o *object) SetGasCoin(name string) Interface {
-	copy(o.GasCoin[:], name)
+// Set ID of a coin to pay fee
+func (o *Object) SetGasCoin(id CoinID) Interface {
+	o.GasCoin = id
 	return o
 }
 
-func (o *object) SetGasPrice(price uint8) Interface {
+// Set fee multiplier
+func (o *Object) SetGasPrice(price uint8) Interface {
 	o.GasPrice = price
 	return o
 }
 
-func (o *object) SetPayload(payload []byte) Interface {
+// Set arbitrary user-defined bytes
+func (o *Object) SetPayload(payload []byte) Interface {
 	o.Payload = payload
 	return o
 }
 
-func (o *object) SetServiceData(serviceData []byte) Interface {
+// Set ServiceData field
+func (o *Object) SetServiceData(serviceData []byte) Interface {
 	o.ServiceData = serviceData
 	return o
 }
 
+// Get string representation of a transaction. RLP-encoded structure in hex format.
 func (tx *Transaction) Encode() (string, error) {
 	src, err := rlp.EncodeToBytes(tx)
 	if err != nil {
@@ -463,7 +594,7 @@ func (tx *Transaction) Encode() (string, error) {
 }
 
 // Get hash of transaction
-func (o *object) Hash() (string, error) {
+func (o *Object) Hash() (string, error) {
 	encode, err := o.Transaction.Encode()
 	if err != nil {
 		return "", err
@@ -479,7 +610,7 @@ func (o *object) Hash() (string, error) {
 	return "Mt" + hex.EncodeToString(hash[:]), nil
 }
 
-func (o *object) addSignature(signatures ...*Signature) (SignedTransaction, error) {
+func (o *Object) addSignature(signatures ...*Signature) (SignedTransaction, error) {
 	signature, err := o.Signature()
 	if err != nil {
 		return nil, err
@@ -498,7 +629,8 @@ func (o *object) addSignature(signatures ...*Signature) (SignedTransaction, erro
 	return o.setSignature(signatureMulti)
 }
 
-func (o *object) AddSignature(signatures ...[]byte) (SignedTransaction, error) {
+// Add signature from bytes
+func (o *Object) AddSignature(signatures ...[]byte) (SignedTransaction, error) {
 	signature, err := o.Signature()
 	if err != nil {
 		return nil, err
@@ -529,8 +661,8 @@ func (o *object) AddSignature(signatures ...[]byte) (SignedTransaction, error) {
 	return o.setSignature(signatureMulti)
 }
 
-// sign transaction
-func (o *object) Sign(key string, multisigPrKeys ...string) (SignedTransaction, error) {
+// Sign transaction
+func (o *Object) Sign(key string, multisigPrKeys ...string) (SignedTransaction, error) {
 	h, err := rlpHash([]interface{}{
 		o.Transaction.Nonce,
 		o.Transaction.ChainID,
@@ -548,7 +680,7 @@ func (o *object) Sign(key string, multisigPrKeys ...string) (SignedTransaction, 
 
 	switch o.SignatureType {
 	case SignatureTypeSingle:
-		signature, err := signature(key, h)
+		signature, err := newSignature(key, h)
 		if err != nil {
 			return nil, err
 		}
@@ -579,7 +711,7 @@ func (o *object) Sign(key string, multisigPrKeys ...string) (SignedTransaction, 
 		}
 		signatures := make([]*Signature, 0, len(multisigPrKeys))
 		for _, prKey := range multisigPrKeys {
-			signature, err := signature(prKey, h)
+			signature, err := newSignature(prKey, h)
 			if err != nil {
 				return nil, err
 			}
@@ -593,7 +725,7 @@ func (o *object) Sign(key string, multisigPrKeys ...string) (SignedTransaction, 
 	}
 }
 
-func signature(prKey string, h [32]byte) (*Signature, error) {
+func newSignature(prKey string, h [32]byte) (*Signature, error) {
 	sig, err := sign(prKey, h)
 	if err != nil {
 		return nil, err

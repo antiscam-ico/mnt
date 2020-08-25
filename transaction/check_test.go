@@ -9,12 +9,12 @@ import (
 
 func TestCheck_Sign(t *testing.T) {
 	check := NewCheck(
-		480,
+		"480",
 		TestNetChainID,
 		999999,
-		"MNT",
+		1,
 		big.NewInt(0).Mul(big.NewInt(10), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil)),
-		"MNT",
+		1,
 	).SetPassphrase("pass")
 
 	sign, err := check.Sign("64e27afaab363f21eec05291084367f6f1297a7b280d69d672febecda94a09ea")
@@ -26,7 +26,7 @@ func TestCheck_Sign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validCheck := "Mcf8ae8334383002830f423f8a4d4e5400000000000000888ac7230489e800008a4d4e5400000000000000b841497c5f3e6fc182fd1a791522a9ef7576710bdfbc86fdbf165476ef220e89f9ff1380f93f2d9a2f92fdab0edc1e2605cc2c69b707cd404b2cb1522b7aba4defd5001ba083c9945169f0a7bbe596973b32dc887608780580b1d3bc7b188bedb3bd385594a047b2d5345946ed5498f5bee713f86276aac046a5fef820beaee77a9b6f9bc1df"
+	validCheck := "Mcf89a8334383002830f423f01888ac7230489e8000001b841ea3d022c8326965556f1b651b14d3124947b8683f7b3ab56fca06e0b4204757b2a11dace85d0139ce4e8fdb18369d07905e733683b8229f41bc216c784b4d714011ca017bffff4b3f431dc938239cd2727f0c1dfa61ccdc98727fa8e9baf608b3755f5a05b768c53d09c5e9517487820df439f496e16e459862e7d449360ce69a2ccc4d6"
 	checkString := encode
 	if checkString != validCheck {
 		t.Errorf("check want %s,\ngot %s", validCheck, checkString)
@@ -35,12 +35,12 @@ func TestCheck_Sign(t *testing.T) {
 
 func TestCheck_Sign1(t *testing.T) {
 	check := NewCheck(
-		1,
+		"1",
 		MainNetChainID,
 		999999,
-		"MNT",
+		1,
 		big.NewInt(0).Mul(big.NewInt(10), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18), nil)),
-		"MNT",
+		1,
 	).SetPassphrase("pass")
 
 	sign, err := check.Sign("2919c43d5c712cae66f869a524d9523999998d51157dc40ac4d8d80a7602ce02")
@@ -53,7 +53,7 @@ func TestCheck_Sign1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	validCheck := "Mcf8ab3101830f423f8a4d4e5400000000000000888ac7230489e800008a4d4e5400000000000000b841f69950a210196529f47df938f7af84958cdb336daf304616c37ef8bebca324910910f046e2ff999a7f2ab564bd690c1102ab65a20e0f27b57a93854339b60837011ba00a07cbf311148a6b62c1d1b34a5e0c2b6931a0547ede8b9dfb37aedff4480622a023ac93f7173ca41499624f06dfdd58c4e65d1279ea526777c194ddb623d57027"
+	validCheck := "Mcf8963101830f423f01888ac7230489e8000001b8416f6efe02689cacf2b169de53e35eb006f3b82c3119f092857d9a30e5f1bafe440f5ae5f617861a00908767ab13db9c08a07e1d207084c62b441cd3ea6eeb5423011ca09f5eee367f22a982766fa6b60b84512f6801714720dd2f36c8a594d3c24452ca9f49175aea5b59ee4162b91e286ba77810a34368c8240b0c96da23507d9c92f6"
 	if checkString != validCheck {
 		t.Errorf("check want %s,\ngot %s", validCheck, checkString)
 	}
@@ -77,19 +77,19 @@ func TestCheckAddress_Proof(t *testing.T) {
 }
 
 func TestDecodeCheck(t *testing.T) {
-	data, err := DecodeCheck("+K6DNDgwAoMPQj+KTU5UAAAAAAAAAIiKxyMEiegAAIpNTlQAAAAAAAAAuEFJfF8+b8GC/Rp5FSKp73V2cQvfvIb9vxZUdu8iDon5/xOA+T8tmi+S/asO3B4mBcwsabcHzUBLLLFSK3q6Te/VABugg8mUUWnwp7vllpc7MtyIdgh4BYCx07x7GIvts704VZSgR7LVNFlG7VSY9b7nE/hidqrARqX++CC+rud6m2+bwd8=")
+	data, err := DecodeCheck("Mcf89a8334383002830f423f01888ac7230489e8000001b841ea3d022c8326965556f1b651b14d3124947b8683f7b3ab56fca06e0b4204757b2a11dace85d0139ce4e8fdb18369d07905e733683b8229f41bc216c784b4d714011ca017bffff4b3f431dc938239cd2727f0c1dfa61ccdc98727fa8e9baf608b3755f5a05b768c53d09c5e9517487820df439f496e16e459862e7d449360ce69a2ccc4d6")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if string(data.Nonce) != "480" {
-		t.Errorf("Nonce want %s, got %s", string(data.Nonce), "480")
+		t.Errorf("Nonce want %s, got %s", "480", string(data.Nonce))
 	}
 	if data.ChainID != TestNetChainID {
 		t.Errorf("ChainID want %d, got %d", data.ChainID, TestNetChainID)
 	}
-	if string(data.Coin[:3]) != "MNT" {
-		t.Errorf("Coin want %s, got %s", string(data.Coin[:3]), "MNT")
+	if data.Coin != 1 {
+		t.Errorf("CoinID want %s, got %d", data.Coin.String(), 1)
 	}
 	if data.DueBlock != 999999 {
 		t.Errorf("DueBlock want %d, got %d", data.DueBlock, 999999)
@@ -97,17 +97,24 @@ func TestDecodeCheck(t *testing.T) {
 	if data.Value.String() != "10"+strings.Repeat("0", 18) {
 		t.Errorf("Value want %s, got %s", data.Value.String(), "10"+strings.Repeat("0", 18))
 	}
-	if data.Lock.String() != "985283871505876742053353384809055983203325304659217336382177168476233943196356552072809135181493031263037291805582875144952622907359402361966594748392133888" {
-		t.Errorf("Lock want %s, got %s", data.Lock.String(), "985283871505876742053353384809055983203325304659217336382177168476233943196356552072809135181493031263037291805582875144952622907359402361966594748392133888")
+	if data.Lock.String() != "3140622329586495619178957840119431069413669815577585079847850638320450546439777094725740545888163635015645563228183373665216451470665191568503369618620355585" {
+		t.Errorf("Lock want %s, got %s", data.Lock.String(), "3140622329586495619178957840119431069413669815577585079847850638320450546439777094725740545888163635015645563228183373665216451470665191568503369618620355585")
 	}
-	if data.V.Int64() != 27 {
-		t.Errorf("V want %d, got %d", data.V.Int64(), 28)
+	if data.V.Int64() != 28 {
+		t.Errorf("V want %d, got %d", 28, data.V.Int64())
 	}
-	if hex.EncodeToString(data.R.Bytes()) != "83c9945169f0a7bbe596973b32dc887608780580b1d3bc7b188bedb3bd385594" {
-		t.Errorf("R want %s, got %s", hex.EncodeToString(data.R.Bytes()), "83c9945169f0a7bbe596973b32dc887608780580b1d3bc7b188bedb3bd385594")
+	if hex.EncodeToString(data.R.Bytes()) != "17bffff4b3f431dc938239cd2727f0c1dfa61ccdc98727fa8e9baf608b3755f5" {
+		t.Errorf("R want %s, got %s", "17bffff4b3f431dc938239cd2727f0c1dfa61ccdc98727fa8e9baf608b3755f5", hex.EncodeToString(data.R.Bytes()))
 	}
-	if hex.EncodeToString(data.S.Bytes()) != "47b2d5345946ed5498f5bee713f86276aac046a5fef820beaee77a9b6f9bc1df" {
-		t.Errorf("S want %s, got %s", hex.EncodeToString(data.S.Bytes()), "47b2d5345946ed5498f5bee713f86276aac046a5fef820beaee77a9b6f9bc1df")
+	if hex.EncodeToString(data.S.Bytes()) != "5b768c53d09c5e9517487820df439f496e16e459862e7d449360ce69a2ccc4d6" {
+		t.Errorf("S want %s, got %s", "5b768c53d09c5e9517487820df439f496e16e459862e7d449360ce69a2ccc4d6", hex.EncodeToString(data.S.Bytes()))
+	}
+}
+
+func TestDecodeCheck_Sender(t *testing.T) {
+	data, err := DecodeCheck("Mcf89a8334383002830f423f01888ac7230489e8000001b841ea3d022c8326965556f1b651b14d3124947b8683f7b3ab56fca06e0b4204757b2a11dace85d0139ce4e8fdb18369d07905e733683b8229f41bc216c784b4d714011ca017bffff4b3f431dc938239cd2727f0c1dfa61ccdc98727fa8e9baf608b3755f5a05b768c53d09c5e9517487820df439f496e16e459862e7d449360ce69a2ccc4d6")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	sender, err := data.Sender()
@@ -116,27 +123,6 @@ func TestDecodeCheck(t *testing.T) {
 	}
 
 	address := "Mxce931863b9c94a526d94acd8090c1c5955a6eb4b"
-	if sender != address {
-		t.Errorf("Sender want %s, got %s", address, sender)
-	}
-}
-
-func TestDecodeCheck_Sender(t *testing.T) {
-	data, err := DecodeCheck("+KwxAoQ7msn/ik1OVAAAAAAAAACIiscjBInoAACKTU5UAAAAAAAAALhBYQJc9o+FL0Z6Az0c4WZu4xi3s1E2qao2l3cGnDOE62o++8TmJywtVrsNJ5fRXOYbYPV15CASqIUImRGp+3rq/gEcoLrEN0b0ePUvPXLb7stC1FL5q3WbbBT1jnb/9AvfeOg3oD0R2ZYtSHDdF8aJs5/wOgyR7Bh5KomUsBWjkoWYMQBC")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if data.Coin.String() != "MNT" {
-		t.Errorf("Coin want %s, got %s", data.Coin.String(), "MNT")
-	}
-
-	sender, err := data.Sender()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	address := "Mx2f574419b6cba6d886341b5cd4110d2b02eafe8e"
 	if sender != address {
 		t.Errorf("Sender want %s, got %s", address, sender)
 	}
